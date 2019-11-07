@@ -2,6 +2,7 @@ import {logarComoTempoDeExecucao, domInject, throttle} from '../helpers/decorato
 import { NegociacoesView, MensagemView } from "../views/index";
 import { Negociacoes, Negociacao, NegociacaoParcial } from "../models/index";
 import { NegociacaoService } from "../services/index";
+import {imprime} from "../helpers/index";
 
 let timer = 0;
 
@@ -46,10 +47,10 @@ export class NegociacaoController{
             parseInt(this._inputQuantidade.val()),
             parseFloat(this._inputValor.val()),
         );
+
+        imprime(negociacao, this._negociacoes);
         this._negociacoes.adiciona(negociacao);
-
         this._negociacoesView.update(this._negociacoes);
-
         this._mensagemView.update('Negociação adicionada com sucesso');
     }
 
@@ -59,26 +60,36 @@ export class NegociacaoController{
 
     }
 
-    @throttle(500)
-    importaDados(event: Event){
-        event.preventDefault();
+    @throttle(500) 
+    async importaDados(){
+        
 
-        function isOk(res: Response){
-            if(res.ok){
-                return false;
-            }else{
-                throw new Error(res.statusText);
-            }
+        try {
+
+            const negociacoesParaImportar = await this._negociacaoService
+                .obterNegociacoes(res =>{
+                    if(res.ok){
+                        return res;
+                    }else{
+                        throw new Error(res.statusText);
+                    }
+                });
+
+            const negociacoesJaImportadas = this._negociacoes.paraArray();
+
+                negociacoesParaImportar
+                    .filter(negociacao => 
+                        !negociacoesJaImportadas.some(jaImportada => 
+                            negociacao.ehIgual(jaImportada)))
+                    .forEach(negociacao => 
+                        this._negociacoes.adiciona(negociacao));
+                        this._negociacoesView.update(this._negociacoes);            
+
+                
+        } catch (error) {
+          this._mensagemView.update(error.message);  
         }
-
-        this._negociacaoService
-            .obterNegociacoes(isOk)
-            .then(negociacoes => {
-
-                negociacoes.forEach(negociacao => this._negociacoes.adiciona(negociacao)))
-                this._negociacoesView.update(this._negociacoes);
-            }
-
+    }
 }
 
 enum diaDaSemana{
